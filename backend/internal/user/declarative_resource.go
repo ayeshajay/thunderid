@@ -118,16 +118,23 @@ func (e *userExporter) GetResourceByID(
 	}
 
 	// Export credentials as placeholders rather than values. A stored credential is a one-way hash, so
-	// the value cannot be exported, and an empty map would leave the imported user with no credential at
-	// all and no way to sign in. Naming the credential here makes the parameterizer emit a template
-	// variable for it, which the importing server fills from its own secret provider or environment
-	// before hashing.
+	// the value cannot be exported. Naming the credential here makes the parameterizer emit a template
+	// variable for it, which the importing server fills from its own secret provider before hashing.
+	//
+	// Only for a user that actually holds one. A user who signs in some other way, or not yet, has no
+	// password to name, and naming one anyway would make every gateway this is applied to demand a
+	// credential the user never had, and refuse the whole user until something supplied it.
+	hasPassword := false
+	if creds, credErr := e.entityService.GetCredentialsByType(ctx, id, documentFieldPassword); credErr == nil {
+		hasPassword = len(creds) > 0
+	}
+
 	exportUser := &userDeclarativeResource{
 		ID:          user.ID,
 		Type:        user.Type,
 		OUID:        user.OUID,
 		Attributes:  attributesMap,
-		Credentials: exportableCredentials(username),
+		Credentials: exportableCredentials(username, hasPassword),
 	}
 
 	return exportUser, username, nil
@@ -139,8 +146,11 @@ func (e *userExporter) GetResourceByID(
 // credentials are a map, so it would export any value here verbatim. Only the password is carried:
 // device bound kinds such as a passkey mean nothing on another deployment. The value never leaves,
 // since it is stored as a one-way hash and the importing server fills the placeholder itself.
-func exportableCredentials(username string) map[string]interface{} {
-	if username == "" {
+//
+// A user with no password carries no credentials at all, which is what lets it be applied to a
+// gateway as it stands.
+func exportableCredentials(username string, hasPassword bool) map[string]interface{} {
+	if username == "" || !hasPassword {
 		return map[string]interface{}{}
 	}
 	return map[string]interface{}{

@@ -32,6 +32,7 @@ var testPublicPaths = []string{
 	"/auth/**",
 	"/register/passkey/**",
 	"/access/**",
+	"/cp/connect",
 }
 
 // SecurityServiceTestSuite defines the test suite for SecurityService
@@ -105,6 +106,7 @@ func (suite *SecurityServiceTestSuite) TestProcess_PublicPaths() {
 		{"OAuth2 token without params", "/oauth2/token"},
 		{"Signin without trailing slash", "/gate/signin"},
 		{"Console without trailing slash", "/console"},
+		{"CP channel connect", "/cp/connect"},
 	}
 
 	for _, tc := range testCases {

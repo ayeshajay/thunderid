@@ -32,12 +32,28 @@ func Initialize(
 	cryptoSvc providers.RuntimeCryptoProvider,
 	serverConfigSvc serverconfig.ServerConfigService,
 	artifactLifetime artifactLifetimeResolver,
+	secretCapturer SecretCapturer,
 ) (ApplicationServiceInterface, declarativeresource.ResourceExporter, error) {
 	appService := newApplicationService(
 		inboundClient, entityService, ouService, i18nService, cryptoSvc, serverConfigSvc, artifactLifetime,
+		secretCapturer,
 	)
 
 	if err := entityService.LoadIndexedAttributes(getAppIndexedAttributes()); err != nil {
+		return nil, nil, err
+	}
+
+	// What this resource type knows about itself, offered to whoever needs it: the rules that hold
+	// on any plane, and how its credential is made. Both are registered here so that a plane which
+	// holds applications has them, and a plane which does not is not carrying rules for a type it
+	// never sees.
+	if err := registerSharedRules(); err != nil {
+		return nil, nil, err
+	}
+	if err := registerSecretGenerator(); err != nil {
+		return nil, nil, err
+	}
+	if err := registerDeploymentFields(); err != nil {
 		return nil, nil, err
 	}
 

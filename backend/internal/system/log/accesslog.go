@@ -4,6 +4,7 @@
 package log
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"net/http"
@@ -64,6 +65,19 @@ type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	size       int
+}
+
+// Hijack passes the connection takeover through to the underlying ResponseWriter.
+//
+// A WebSocket upgrade takes the connection over, and without this the wrapper hides the underlying
+// writer's Hijacker and the upgrade is refused with 501. The access log has nothing useful to say
+// about a hijacked connection, so the entry it would have written is left to the handler.
+func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := lrw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("the underlying ResponseWriter does not support hijacking")
+	}
+	return hijacker.Hijack()
 }
 
 // WriteHeader captures the status code and delegates to the original ResponseWriter.

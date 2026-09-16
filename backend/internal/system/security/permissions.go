@@ -45,6 +45,7 @@ var publicPaths = []string{
 	"/auth/**",
 	"/register/passkey/**",
 	"/access/**",
+	"/cp/connect", // Control Plane phone-home WebSocket; authenticated by a shared token in the channel handler.
 }
 
 // ---- Resource types ----
@@ -64,6 +65,10 @@ const (
 	ResourceTypeUserType ResourceType = "usertype"
 	// ResourceTypeAgentType identifies an agent-category entity type resource.
 	ResourceTypeAgentType ResourceType = "agenttype"
+	// ResourceTypeGatewayVariable identifies a non-secret gateway variable resource.
+	ResourceTypeGatewayVariable ResourceType = "gatewayvariable"
+	// ResourceTypeTenant identifies a tenant resource.
+	ResourceTypeTenant ResourceType = "tenant"
 )
 
 // ---- Actions ----
@@ -128,6 +133,24 @@ const (
 	ActionDeleteAgentType Action = "agenttype:delete"
 	// ActionListAgentTypes lists agent types.
 	ActionListAgentTypes Action = "agenttype:list"
+
+	// ActionCreateGatewayVariable creates a new gateway variable.
+	ActionCreateGatewayVariable Action = "gatewayvariable:create"
+	// ActionReadGatewayVariable reads a gateway variable.
+	ActionReadGatewayVariable Action = "gatewayvariable:read"
+	// ActionUpdateGatewayVariable updates a gateway variable.
+	ActionUpdateGatewayVariable Action = "gatewayvariable:update"
+	// ActionDeleteGatewayVariable deletes a gateway variable.
+	ActionDeleteGatewayVariable Action = "gatewayvariable:delete"
+	// ActionListGatewayVariables lists gateway variables.
+	ActionListGatewayVariables Action = "gatewayvariable:list"
+
+	// ActionCreateTenant provisions the caller's own workspace.
+	ActionCreateTenant Action = "tenant:create"
+	// ActionReadTenant reads the caller's own workspace.
+	ActionReadTenant Action = "tenant:read"
+	// ActionDeleteTenant deprovisions a tenant.
+	ActionDeleteTenant Action = "tenant:delete"
 )
 
 // ---- Permissions ----
@@ -135,17 +158,21 @@ const (
 // SystemPermissions holds the runtime-resolved permission strings for the system resource server.
 // All values are set by InitSystemPermissions and must not be used before it is called.
 type SystemPermissions struct {
-	Root          string
-	OU            string
-	OUView        string
-	User          string
-	UserView      string
-	Group         string
-	GroupView     string
-	UserType      string
-	UserTypeView  string
-	AgentType     string
-	AgentTypeView string
+	Root           string
+	OU             string
+	OUView         string
+	User           string
+	UserView       string
+	Group          string
+	GroupView      string
+	UserType       string
+	UserTypeView   string
+	AgentType      string
+	AgentTypeView  string
+	GatewayVar     string
+	GatewayVarView string
+	Tenant         string
+	TenantView     string
 }
 
 // sysPerms holds the active system permissions, initialized by InitSystemPermissions.
@@ -168,17 +195,21 @@ func buildPermission(parts ...string) string {
 // This function must be called once at startup before any service or middleware uses permissions.
 func InitSystemPermissions(handle string) {
 	p := &SystemPermissions{
-		Root:          buildPermission(handle, "system"),
-		OU:            buildPermission(handle, "system", "ou"),
-		OUView:        buildPermission(handle, "system", "ou", "view"),
-		User:          buildPermission(handle, "system", "user"),
-		UserView:      buildPermission(handle, "system", "user", "view"),
-		Group:         buildPermission(handle, "system", "group"),
-		GroupView:     buildPermission(handle, "system", "group", "view"),
-		UserType:      buildPermission(handle, "system", "usertype"),
-		UserTypeView:  buildPermission(handle, "system", "usertype", "view"),
-		AgentType:     buildPermission(handle, "system", "agenttype"),
-		AgentTypeView: buildPermission(handle, "system", "agenttype", "view"),
+		Root:           buildPermission(handle, "system"),
+		OU:             buildPermission(handle, "system", "ou"),
+		OUView:         buildPermission(handle, "system", "ou", "view"),
+		User:           buildPermission(handle, "system", "user"),
+		UserView:       buildPermission(handle, "system", "user", "view"),
+		Group:          buildPermission(handle, "system", "group"),
+		GroupView:      buildPermission(handle, "system", "group", "view"),
+		UserType:       buildPermission(handle, "system", "usertype"),
+		UserTypeView:   buildPermission(handle, "system", "usertype", "view"),
+		AgentType:      buildPermission(handle, "system", "agenttype"),
+		AgentTypeView:  buildPermission(handle, "system", "agenttype", "view"),
+		GatewayVar:     buildPermission(handle, "system", "gatewayvariable"),
+		GatewayVarView: buildPermission(handle, "system", "gatewayvariable", "view"),
+		Tenant:         buildPermission(handle, "system", "tenant"),
+		TenantView:     buildPermission(handle, "system", "tenant", "view"),
 	}
 	sysPerms = p
 
@@ -218,6 +249,18 @@ func InitSystemPermissions(handle string) {
 		ActionUpdateAgentType: p.AgentType,
 		ActionDeleteAgentType: p.AgentType,
 		ActionListAgentTypes:  p.AgentTypeView,
+
+		// Gateway variable actions.
+		ActionCreateGatewayVariable: p.GatewayVar,
+		ActionReadGatewayVariable:   p.GatewayVarView,
+		ActionUpdateGatewayVariable: p.GatewayVar,
+		ActionDeleteGatewayVariable: p.GatewayVar,
+		ActionListGatewayVariables:  p.GatewayVarView,
+
+		// Tenant actions. A caller acts on its own workspace, named by its token.
+		ActionCreateTenant: p.Tenant,
+		ActionReadTenant:   p.TenantView,
+		ActionDeleteTenant: p.Tenant,
 	}
 
 	apiPermissionEntries = []apiPermissionEntry{
@@ -269,6 +312,40 @@ func InitSystemPermissions(handle string) {
 		{"GET /agent-types/**", p.AgentTypeView},
 		{"PUT /agent-types/**", p.AgentType},
 		{"DELETE /agent-types/**", p.AgentType},
+
+		// Gateway variable APIs. A variable belongs to one gateway and is served under it, so these
+		// name that path; a rule naming a path the server does not serve matches nothing and leaves
+		// the route on the root permission. They precede the gateway rules below, which would
+		// otherwise match the same requests first and demand more.
+		//
+		// Resolve returns non-secret values that reads already expose, so the view permission covers it.
+		{"GET /gateways/*/variables", p.GatewayVarView},
+		{"POST /gateways/*/variables", p.GatewayVar},
+		{"GET /gateways/*/variables/**", p.GatewayVarView},
+		{"PUT /gateways/*/variables/**", p.GatewayVar},
+		{"DELETE /gateways/*/variables/**", p.GatewayVar},
+
+		// Versions belong to the organization. Capturing one reads the whole of its configuration, so
+		// it takes the root system permission, as does everything else about a gateway: registering
+		// one, issuing its data plane token, applying a version. Stated rather than left to the
+		// fallback, so the requirement is visible here and does not change with it. Promotion carries
+		// a second, separate scope check.
+		{"GET /versions", p.Root},
+		{"POST /versions", p.Root},
+		{"GET /versions/**", p.Root},
+		{"GET /gateways", p.Root},
+		{"POST /gateways", p.Root},
+		{"GET /gateways/**", p.Root},
+		{"POST /gateways/**", p.Root},
+		{"PATCH /gateways/**", p.Root},
+		{"PUT /gateways/**", p.Root},
+		{"DELETE /gateways/**", p.Root},
+
+		// Tenant self-management APIs. These act on the caller's own workspace, named by the deployment
+		// claim in its token, so the scope is all there is to check.
+		{"GET /tenant", p.TenantView},
+		{"POST /tenant", p.Tenant},
+		{"DELETE /tenant", p.Tenant},
 
 		// Import APIs.
 		{"POST /import", p.Root},

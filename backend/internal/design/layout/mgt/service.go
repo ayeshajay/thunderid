@@ -15,6 +15,7 @@ import (
 
 	serverconst "github.com/thunder-id/thunderid/internal/system/constants"
 	"github.com/thunder-id/thunderid/internal/system/log"
+	"github.com/thunder-id/thunderid/internal/system/managedresource"
 	"github.com/thunder-id/thunderid/internal/system/resourcedependency"
 	"github.com/thunder-id/thunderid/internal/system/utils"
 )
@@ -170,6 +171,11 @@ func (ls *layoutMgtService) GetLayout(ctx context.Context, id string) (*Layout, 
 // UpdateLayout updates an existing layout configuration.
 func (ls *layoutMgtService) UpdateLayout(ctx context.Context,
 	id string, layout UpdateLayoutRequest) (*Layout, *tidcommon.ServiceError) {
+	// A resource applied from the control plane is owned there. Changing it here would last only
+	// until the next promotion overwrote it, so the change is refused instead.
+	if svcErr := managedresource.Guard(ctx, managedresource.TypeLayout, id); svcErr != nil {
+		return nil, svcErr
+	}
 	ls.logger.Debug(ctx, "Updating layout", log.String("id", id))
 
 	if id == "" {
@@ -223,6 +229,11 @@ func (ls *layoutMgtService) UpdateLayout(ctx context.Context,
 
 // DeleteLayout deletes a layout configuration.
 func (ls *layoutMgtService) DeleteLayout(ctx context.Context, id string) *tidcommon.ServiceError {
+	// A resource applied from the control plane is owned there. Changing it here would last only
+	// until the next promotion overwrote it, so the change is refused instead.
+	if svcErr := managedresource.Guard(ctx, managedresource.TypeLayout, id); svcErr != nil {
+		return svcErr
+	}
 	ls.logger.Debug(ctx, "Deleting layout", log.String("id", id))
 
 	if id == "" {

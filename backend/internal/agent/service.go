@@ -24,6 +24,7 @@ import (
 	"github.com/thunder-id/thunderid/internal/role"
 	serverconst "github.com/thunder-id/thunderid/internal/system/constants"
 	"github.com/thunder-id/thunderid/internal/system/log"
+	"github.com/thunder-id/thunderid/internal/system/managedresource"
 	"github.com/thunder-id/thunderid/internal/system/resourcedependency"
 	"github.com/thunder-id/thunderid/internal/system/security"
 	sysutils "github.com/thunder-id/thunderid/internal/system/utils"
@@ -58,6 +59,7 @@ type agentService struct {
 	ouService            oupkg.OrganizationUnitServiceInterface
 	dependencyRegistry   resourcedependency.Registry
 	roleService          role.RoleServiceInterface
+	secretCapturer       SecretCapturer
 }
 
 func newAgentService(
@@ -65,6 +67,7 @@ func newAgentService(
 	inboundClientService inboundclient.InboundClientServiceInterface,
 	ouService oupkg.OrganizationUnitServiceInterface,
 	roleService role.RoleServiceInterface,
+	secretCapturer SecretCapturer,
 ) AgentServiceInterface {
 	return &agentService{
 		logger:               log.GetLogger().With(log.String(log.LoggerKeyComponentName, "AgentService")),
@@ -72,6 +75,7 @@ func newAgentService(
 		inboundClientService: inboundClientService,
 		ouService:            ouService,
 		roleService:          roleService,
+		secretCapturer:       secretCapturer,
 	}
 }
 
@@ -151,6 +155,7 @@ func (s *agentService) CreateAgent(ctx context.Context, agent *providers.Agent) 
 		agent.AllowedUserTypes, agent.AllowedAgentTypes, inboundConfigs)
 	resp.OUID = agent.OUID
 	s.populateOUHandleForComplete(ctx, resp)
+	s.captureSecret(ctx, agent.Name, clientSecret)
 	return resp, nil
 }
 
@@ -215,6 +220,11 @@ func (s *agentService) GetAgentList(ctx context.Context, limit, offset int,
 // UpdateAgent applies a full-replacement update to the agent.
 func (s *agentService) UpdateAgent(ctx context.Context, agentID string,
 	req *model.UpdateAgentRequest) (*model.AgentCompleteResponse, *tidcommon.ServiceError) {
+	// A resource applied from the control plane is owned there. Changing it here would last only
+	// until the next promotion overwrote it, so the change is refused instead.
+	if svcErr := managedresource.Guard(ctx, managedresource.TypeAgent, agentID); svcErr != nil {
+		return nil, svcErr
+	}
 	if agentID == "" {
 		return nil, &ErrorMissingAgentID
 	}
@@ -343,6 +353,7 @@ func (s *agentService) UpdateAgent(ctx context.Context, agentID string,
 		req.AllowedUserTypes, req.AllowedAgentTypes, inboundConfigs)
 	resp.OUID = ouID
 	s.populateOUHandleForComplete(ctx, resp)
+	s.captureSecret(ctx, req.Name, clientSecret)
 	return resp, nil
 }
 
@@ -354,6 +365,11 @@ func (s *agentService) SetDependencyRegistry(r resourcedependency.Registry) {
 }
 
 func (s *agentService) DeleteAgent(ctx context.Context, agentID string) *tidcommon.ServiceError {
+	// A resource applied from the control plane is owned there. Changing it here would last only
+	// until the next promotion overwrote it, so the change is refused instead.
+	if svcErr := managedresource.Guard(ctx, managedresource.TypeAgent, agentID); svcErr != nil {
+		return svcErr
+	}
 	if agentID == "" {
 		return &ErrorMissingAgentID
 	}
@@ -1084,6 +1100,8 @@ func (s *agentService) buildListResponse(ctx context.Context, entities []provide
 			IsReadOnly:  e.IsReadOnly,
 		})
 	}
+
+	markManagedAgents(ctx, agents)
 
 	if includeDisplay {
 		s.populateOUHandlesForList(ctx, agents)
@@ -1908,4 +1926,18 @@ func (s *agentService) translateCertOperationError(
 		Key:          key,
 		DefaultValue: prefix + err.Underlying.ErrorDescription.DefaultValue,
 	})
+}
+
+// markManagedAgents reports the control plane owned entries as read only, which is what a client
+// renders its edit and delete controls from.
+func markManagedAgents(ctx context.Context, items []model.BasicAgentResponse) {
+	managed := managedresource.Default().ManagedIDs(ctx, managedresource.TypeAgent)
+	if len(managed) == 0 {
+		return
+	}
+	for i := range items {
+		if managed[items[i].ID] {
+			items[i].IsReadOnly = true
+		}
+	}
 }

@@ -100,3 +100,43 @@ func toSnakeCaseUpper(s string) string {
 
 	return strings.ToUpper(result.String())
 }
+
+// The prefixes a declarative value carries when it refers to something supplied per deployment
+// rather than holding it.
+//
+// Two prefixes rather than one, because the gateway resolving them has to know which store to look
+// in: a variable is a value it can hand back, a secret is one it only ever substitutes. Telling them
+// apart by the reference itself means an import does not need a schema of which fields are secret,
+// and a credential cannot be resolved from the store whose reads return values.
+const (
+	// VariablePrefix marks a reference to a plain variable, such as a redirect URI.
+	VariablePrefix = "var:"
+	// SecretPrefix marks a reference to a credential, such as a client secret.
+	SecretPrefix = "sec:"
+)
+
+// VariableReference renders a reference to a plain variable.
+func VariableReference(name string) string { return VariablePrefix + name }
+
+// SecretReference renders a reference to a credential.
+func SecretReference(name string) string { return SecretPrefix + name }
+
+// ParseReference reads a value that may be a reference, reporting the name it points at and whether
+// that name is a secret. A value that is not a reference is reported as such rather than guessed at.
+func ParseReference(value string) (name string, isSecret bool, ok bool) {
+	trimmed := strings.TrimSpace(value)
+	switch {
+	case strings.HasPrefix(trimmed, SecretPrefix):
+		return strings.TrimPrefix(trimmed, SecretPrefix), true, true
+	case strings.HasPrefix(trimmed, VariablePrefix):
+		return strings.TrimPrefix(trimmed, VariablePrefix), false, true
+	default:
+		return "", false, false
+	}
+}
+
+// IsReference reports whether a value refers to something supplied per deployment.
+func IsReference(value string) bool {
+	_, _, ok := ParseReference(value)
+	return ok
+}

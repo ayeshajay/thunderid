@@ -12,6 +12,7 @@ import {RoutesProvider, ToastProvider} from '@thunderid/contexts';
 import {ProtectedRoute} from '@thunderid/react-router';
 import {lazy, Suspense, type JSX} from 'react';
 import {BrowserRouter, Navigate, Outlet, Route, Routes} from 'react-router';
+import PlaneRouteGuard from './components/PlaneRouteGuard';
 import RouteConfig, {ROUTE_SEGMENTS} from './configs/RouteConfig';
 import AgentCreateProvider from './features/agents/contexts/AgentCreate/AgentCreateProvider';
 import ApplicationCreateProvider from './features/applications/contexts/ApplicationCreate/ApplicationCreateProvider';
@@ -117,6 +118,13 @@ const ConnectionConfigureWizardPage = lazy(() =>
 const ConnectionCreateWizardPage = lazy(() =>
   import('@thunderid/configure-connections').then((m) => ({default: m.ConnectionCreateWizardPage})),
 );
+const PromotionsListPage = lazy(() => import('./features/promotions/pages/PromotionsListPage'));
+const GatewayDetailPage = lazy(() => import('./features/promotions/pages/GatewayDetailPage'));
+const GatewaySecretsPage = lazy(() => import('./features/promotions/pages/GatewaySecretsPage'));
+const PromotePage = lazy(() => import('./features/promotions/pages/PromotePage'));
+const GatewayVariablesListPage = lazy(() => import('./features/gateway-variables/pages/GatewayVariablesListPage'));
+const GatewayVariableEditPage = lazy(() => import('./features/gateway-variables/pages/GatewayVariableEditPage'));
+const CreateGatewayVariablePage = lazy(() => import('./features/gateway-variables/pages/CreateGatewayVariablePage'));
 const FlowBuilderPage = lazy(() => import('./features/flows/pages/FlowBuilderPage'));
 const CreateRolePage = lazy(() => import('@thunderid/configure-roles').then((m) => ({default: m.CreateRolePage})));
 const RoleEditPage = lazy(() => import('@thunderid/configure-roles').then((m) => ({default: m.RoleEditPage})));
@@ -161,6 +169,7 @@ export default function App(): JSX.Element {
       <RoutesProvider paths={RouteConfig}>
         <ToastProvider>
           <WelcomeRedirect />
+          <PlaneRouteGuard />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route
@@ -211,6 +220,16 @@ export default function App(): JSX.Element {
                   element={<ResourceServerEditPage />}
                 />
                 <Route path={ROUTE_SEGMENTS.settings} element={<SettingsPage />} />
+                <Route path="promotions" element={<PromotionsListPage />} />
+                <Route path="promotions/:gatewayId" element={<GatewayDetailPage />} />
+                <Route path="promotions/:gatewayId/secrets" element={<GatewaySecretsPage />} />
+                <Route path="promotions/:gatewayId/promote" element={<PromotePage />} />
+                {/* A variable belongs to a gateway, so it is reached through one. */}
+                <Route path="promotions/:gatewayId/variables" element={<GatewayVariablesListPage />} />
+                <Route
+                  path="promotions/:gatewayId/variables/:gatewayVariableId"
+                  element={<GatewayVariableEditPage />}
+                />
               </Route>
               {/* Organization Units - wrapped in OrganizationUnitProvider to preserve tree state across navigation */}
               <Route
@@ -514,6 +533,16 @@ export default function App(): JSX.Element {
                 }
               >
                 <Route index element={<TranslationCreatePage />} />
+              </Route>
+              <Route
+                path="/promotions/:gatewayId/variables/create"
+                element={
+                  <ProtectedRoute>
+                    <FullScreenLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<CreateGatewayVariablePage />} />
               </Route>
               <Route
                 path={RouteConfig.translations.list()}

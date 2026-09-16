@@ -13,6 +13,7 @@ import (
 
 	"github.com/thunder-id/thunderid/internal/system/config"
 	"github.com/thunder-id/thunderid/internal/system/database/provider"
+	"github.com/thunder-id/thunderid/internal/system/deployment"
 	"github.com/thunder-id/thunderid/internal/system/log"
 )
 
@@ -87,22 +88,24 @@ func (s *flowStore) ListFlows(ctx context.Context, limit, offset int, flowType s
 		var err error
 
 		if flowType != "" {
-			countResults, err = dbClient.QueryContext(ctx, queryCountFlowsWithType, flowType, s.deploymentID)
+			countResults, err = dbClient.QueryContext(ctx, queryCountFlowsWithType, flowType, s.scope(ctx))
 			if err != nil {
 				return fmt.Errorf("failed to count flows: %w", err)
 			}
 
-			results, err = dbClient.QueryContext(ctx, queryListFlowsWithType, flowType, s.deploymentID, limit, offset)
+			results, err = dbClient.QueryContext(ctx, queryListFlowsWithType, flowType, s.scope(ctx),
+				limit, offset)
 			if err != nil {
 				return fmt.Errorf("failed to list flows: %w", err)
 			}
 		} else {
-			countResults, err = dbClient.QueryContext(ctx, queryCountFlows, s.deploymentID)
+			countResults, err = dbClient.QueryContext(ctx, queryCountFlows, s.scope(ctx))
 			if err != nil {
 				return fmt.Errorf("failed to count flows: %w", err)
 			}
 
-			results, err = dbClient.QueryContext(ctx, queryListFlows, s.deploymentID, limit, offset)
+			results, err = dbClient.QueryContext(ctx, queryListFlows, s.scope(ctx), limit,
+				offset)
 			if err != nil {
 				return fmt.Errorf("failed to list flows: %w", err)
 			}
@@ -138,7 +141,7 @@ func (s *flowStore) ListActiveFlowsWithNodes(ctx context.Context) ([]*providers.
 	var flows []*providers.CompleteFlowDefinition
 
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		results, err := dbClient.QueryContext(ctx, queryListActiveFlowsWithNodes, s.deploymentID)
+		results, err := dbClient.QueryContext(ctx, queryListActiveFlowsWithNodes, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to list flows with nodes: %w", err)
 		}
@@ -177,13 +180,13 @@ func (s *flowStore) CreateFlow(ctx context.Context, flowID string, flow *FlowDef
 
 	err = s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
 		_, err := dbClient.ExecuteContext(ctx, queryCreateFlow, flowID, flow.Handle,
-			flow.Name, flow.FlowType, int64(1), s.deploymentID)
+			flow.Name, flow.FlowType, int64(1), s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to create flow: %w", err)
 		}
 
 		_, err = dbClient.ExecuteContext(ctx, queryInsertFlowVersion,
-			flowID, 1, string(nodesJSON), string(interceptorsJSON), s.deploymentID)
+			flowID, 1, string(nodesJSON), string(interceptorsJSON), s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to create flow version: %w", err)
 		}
@@ -201,7 +204,7 @@ func (s *flowStore) CreateFlow(ctx context.Context, flowID string, flow *FlowDef
 func (s *flowStore) GetFlowByID(ctx context.Context, flowID string) (*providers.CompleteFlowDefinition, error) {
 	var flow *providers.CompleteFlowDefinition
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		results, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.deploymentID)
+		results, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get flow: %w", err)
 		}
@@ -222,7 +225,8 @@ func (s *flowStore) GetFlowByHandle(ctx context.Context, handle string, flowType
 	*providers.CompleteFlowDefinition, error) {
 	var flow *providers.CompleteFlowDefinition
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		results, err := dbClient.QueryContext(ctx, queryGetFlowByHandle, handle, string(flowType), s.deploymentID)
+		results, err := dbClient.QueryContext(ctx, queryGetFlowByHandle, handle, string(flowType),
+			s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get flow by handle: %w", err)
 		}
@@ -253,7 +257,7 @@ func (s *flowStore) UpdateFlow(ctx context.Context, flowID string, flow *FlowDef
 	}
 
 	err = s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		flowResults, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.deploymentID)
+		flowResults, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get flow metadata: %w", err)
 		}
@@ -274,7 +278,7 @@ func (s *flowStore) UpdateFlow(ctx context.Context, flowID string, flow *FlowDef
 			return err
 		}
 
-		_, err = dbClient.ExecuteContext(ctx, queryUpdateFlow, flowID, flow.Name, newVersion, s.deploymentID)
+		_, err = dbClient.ExecuteContext(ctx, queryUpdateFlow, flowID, flow.Name, newVersion, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to update flow: %w", err)
 		}
@@ -296,7 +300,7 @@ func (s *flowStore) InvalidateCache(_ context.Context, _, _ string, _ providers.
 // DeleteFlow deletes a flow definition and all its version history.
 func (s *flowStore) DeleteFlow(ctx context.Context, flowID string) error {
 	return s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		_, err := dbClient.ExecuteContext(ctx, queryDeleteFlow, flowID, s.deploymentID)
+		_, err := dbClient.ExecuteContext(ctx, queryDeleteFlow, flowID, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to delete flow: %w", err)
 		}
@@ -313,7 +317,7 @@ func (s *flowStore) IsFlowExistsByHandle(
 	var exists bool
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
 		results, err := dbClient.QueryContext(ctx, queryCheckFlowExistsByHandle,
-			handle, string(flowType), s.deploymentID)
+			handle, string(flowType), s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to check flow existence by handle: %w", err)
 		}
@@ -330,7 +334,7 @@ func (s *flowStore) ListFlowVersions(ctx context.Context, flowID string) ([]Basi
 	var versions []BasicFlowVersion
 
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		results, err := dbClient.QueryContext(ctx, queryListFlowVersions, flowID, s.deploymentID)
+		results, err := dbClient.QueryContext(ctx, queryListFlowVersions, flowID, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to list flow versions: %w", err)
 		}
@@ -355,7 +359,8 @@ func (s *flowStore) GetFlowVersion(ctx context.Context, flowID string, version i
 	var flowVersion *FlowVersion
 
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		results, err := dbClient.QueryContext(ctx, queryGetFlowVersionWithMetadata, flowID, version, s.deploymentID)
+		results, err := dbClient.QueryContext(ctx, queryGetFlowVersionWithMetadata, flowID, version,
+			s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get flow version: %w", err)
 		}
@@ -376,7 +381,7 @@ func (s *flowStore) GetFlowVersion(ctx context.Context, flowID string, version i
 func (s *flowStore) RestoreFlowVersion(ctx context.Context, flowID string, version int) (
 	*providers.CompleteFlowDefinition, error) {
 	err := s.withDBClientContext(ctx, func(dbClient provider.DBClientInterface) error {
-		flowResults, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.deploymentID)
+		flowResults, err := dbClient.QueryContext(ctx, queryGetFlow, flowID, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get flow metadata: %w", err)
 		}
@@ -389,7 +394,7 @@ func (s *flowStore) RestoreFlowVersion(ctx context.Context, flowID string, versi
 			return errFlowNotFound
 		}
 
-		versionResults, err := dbClient.QueryContext(ctx, queryGetFlowVersion, flowID, version, s.deploymentID)
+		versionResults, err := dbClient.QueryContext(ctx, queryGetFlowVersion, flowID, version, s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to get version to restore: %w", err)
 		}
@@ -414,7 +419,8 @@ func (s *flowStore) RestoreFlowVersion(ctx context.Context, flowID string, versi
 			return err
 		}
 
-		_, err = dbClient.ExecuteContext(ctx, queryUpdateFlow, flowID, currentFlow.Name, newVersion, s.deploymentID)
+		_, err = dbClient.ExecuteContext(ctx, queryUpdateFlow, flowID, currentFlow.Name, newVersion,
+			s.scope(ctx))
 		if err != nil {
 			return fmt.Errorf("failed to update flow: %w", err)
 		}
@@ -433,12 +439,12 @@ func (s *flowStore) RestoreFlowVersion(ctx context.Context, flowID string, versi
 func (s *flowStore) pushToVersionStack(ctx context.Context, dbClient provider.DBClientInterface,
 	flowID string, version int, nodesJSON string, interceptorsJSON string) error {
 	_, err := dbClient.ExecuteContext(ctx, queryInsertFlowVersion,
-		flowID, version, nodesJSON, interceptorsJSON, s.deploymentID)
+		flowID, version, nodesJSON, interceptorsJSON, s.scope(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to insert flow version: %w", err)
 	}
 
-	countResults, err := dbClient.QueryContext(ctx, queryCountFlowVersions, flowID, s.deploymentID)
+	countResults, err := dbClient.QueryContext(ctx, queryCountFlowVersions, flowID, s.scope(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to count versions: %w", err)
 	}
@@ -449,7 +455,7 @@ func (s *flowStore) pushToVersionStack(ctx context.Context, dbClient provider.DB
 	}
 
 	if versionCount > s.maxVersionHistory {
-		if _, err := dbClient.ExecuteContext(ctx, queryDeleteOldestVersion, flowID, s.deploymentID); err != nil {
+		if _, err := dbClient.ExecuteContext(ctx, queryDeleteOldestVersion, flowID, s.scope(ctx)); err != nil {
 			return fmt.Errorf("failed to delete oldest version: %w", err)
 		}
 	}
@@ -753,4 +759,10 @@ func getMaxVersionHistory() int {
 	}
 
 	return flowConfig.MaxVersionHistory
+}
+
+// scope is the deployment this store acts for: the one the request names, or the one this
+// store was built for when a caller carries none.
+func (s *flowStore) scope(ctx context.Context) string {
+	return deployment.ResolveOr(ctx, s.deploymentID)
 }

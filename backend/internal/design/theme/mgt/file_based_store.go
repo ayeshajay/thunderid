@@ -54,7 +54,7 @@ func (f *themeFileBasedStore) DeleteTheme(ctx context.Context, id string) error 
 
 // GetTheme implements themeMgtStoreInterface.
 func (f *themeFileBasedStore) GetTheme(ctx context.Context, id string) (Theme, error) {
-	data, err := f.GenericFileBasedStore.Get(id)
+	data, err := f.GenericFileBasedStore.Get(ctx, id)
 	if err != nil {
 		return Theme{}, errThemeNotFound
 	}
@@ -76,7 +76,7 @@ func (f *themeFileBasedStore) GetThemeList(ctx context.Context, limit, offset in
 		return []Theme{}, nil
 	}
 
-	list, err := f.GenericFileBasedStore.List()
+	list, err := f.GenericFileBasedStore.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (f *themeFileBasedStore) GetThemeList(ctx context.Context, limit, offset in
 
 // GetThemeListCount implements themeMgtStoreInterface.
 func (f *themeFileBasedStore) GetThemeListCount(ctx context.Context) (int, error) {
-	count, err := f.GenericFileBasedStore.Count()
+	count, err := f.GenericFileBasedStore.Count(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -132,7 +132,7 @@ func (f *themeFileBasedStore) IsThemeDeclarative(ctx context.Context, id string)
 // IsThemeHandleConflict checks if a theme handle already exists (excluding a specific ID).
 func (f *themeFileBasedStore) IsThemeHandleConflict(ctx context.Context, handle string, excludeID string) (bool,
 	error) {
-	list, err := f.GenericFileBasedStore.List()
+	list, err := f.GenericFileBasedStore.List(ctx)
 	if err != nil {
 		return false, err
 	}

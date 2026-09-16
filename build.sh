@@ -236,8 +236,10 @@ function build_backend() {
 
     # Set binary name with .exe extension for Windows
     local output_binary="$BINARY_NAME"
+    local cp_output_binary="${BINARY_NAME}-cp"
     if [ "$GO_OS" = "windows" ]; then
         output_binary="${BINARY_NAME}.exe"
+        cp_output_binary="${BINARY_NAME}-cp.exe"
     fi
 
     # Check if coverage build is requested via ENABLE_COVERAGE environment variable
@@ -258,10 +260,17 @@ function build_backend() {
         build_flags="$build_flags -cover -coverpkg=$coverpkg"
     fi
 
+    # One binary per plane. The plane is not configured, it is linked: the control plane binary
+    # contains no runtime, and the data plane binary contains no authoring surface.
     GOOS=$GO_OS GOARCH=$GO_ARCH CGO_ENABLED=0 go build -C "$BACKEND_BASE_DIR" \
     $build_flags -ldflags "-X \"main.version=$VERSION\" \
     -X \"main.buildDate=$$(date -u '+%Y-%m-%d %H:%M:%S UTC')\"" \
     -o "../$BUILD_DIR/$output_binary" ./cmd/server
+
+    GOOS=$GO_OS GOARCH=$GO_ARCH CGO_ENABLED=0 go build -C "$BACKEND_BASE_DIR" \
+    $build_flags -ldflags "-X \"main.version=$VERSION\" \
+    -X \"main.buildDate=$$(date -u '+%Y-%m-%d %H:%M:%S UTC')\"" \
+    -o "../$BUILD_DIR/$cp_output_binary" ./cmd/cpserver
 
     echo "Initializing databases..."
     initialize_databases true

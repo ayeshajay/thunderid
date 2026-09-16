@@ -13,6 +13,41 @@ import (
 const schemeHTTPS = "https"
 const localhost = "localhost"
 
+// Validate checks the server configuration. The deployment-id source is an exclusive switch: "token"
+// requires a claim name (there is no configured-identifier fallback in that mode), and any value
+// other than "server"/"token" (or empty, which means "server") is rejected.
+func (c *ServerConfig) Validate() error {
+	// Switched on with nothing to prove would accept a deployment id from anyone, so it is refused
+	// rather than quietly ignored.
+	if c.DeploymentIDHeader.Enabled && strings.TrimSpace(c.DeploymentIDHeader.Key) == "" {
+		return fmt.Errorf("server.deployment_id_header.key must be set when it is enabled")
+	}
+
+	// A header can only name the deployment where the deployment is per request. In server mode every
+	// request acts for the configured identifier, so honoring one would be silently ignored.
+	if c.DeploymentIDHeader.Honors() && c.DeploymentIDSource != DeploymentIDSourceToken {
+		return fmt.Errorf(
+			"server.deployment_id_header is only meaningful when server.deployment_id_source is %q",
+			DeploymentIDSourceToken)
+	}
+
+	switch c.DeploymentIDSource {
+	case "", DeploymentIDSourceServer:
+		return nil
+	case DeploymentIDSourceToken:
+		if strings.TrimSpace(c.DeploymentIDClaim) == "" {
+			return fmt.Errorf(
+				"server.deployment_id_claim must be set when server.deployment_id_source is %q",
+				DeploymentIDSourceToken)
+		}
+		return nil
+	default:
+		return fmt.Errorf(
+			"server.deployment_id_source %q is not supported (use %q or %q)",
+			c.DeploymentIDSource, DeploymentIDSourceServer, DeploymentIDSourceToken)
+	}
+}
+
 // Validate checks the security configuration for correctness, including any nested
 // sections that expose their own Validate method.
 func (c *SecurityConfig) Validate() error {

@@ -117,6 +117,8 @@ backend/bin
 tools/cli/bin
 tools/i18n-extractor/bin
 backend/server
+backend/cpserver
+backend/dpserver
 
 # E2E extracted distribution
 tests/e2e/distribution/
@@ -147,3 +149,5 @@ backend/cmd/server/bootstrap/03-dev-server-configurations.yaml
 
 # Development internals guide (not intended for commit)
 THUNDERID_INTERNALS_GUIDE.md
+
+backend/cmd/server/apps/

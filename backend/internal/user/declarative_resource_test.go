@@ -167,11 +167,14 @@ func (suite *DeclarativeResourceTestSuite) TestParseToUserWrapper() {
 
 func (suite *DeclarativeResourceTestSuite) TestUserExporter_GetResourceByID() {
 	mockSvc := NewUserServiceInterfaceMock(suite.T())
-	exporter := newUserExporter(mockSvc, entitymock.NewEntityServiceInterfaceMock(suite.T()))
+	entityServiceMock := entitymock.NewEntityServiceInterfaceMock(suite.T())
+	exporter := newUserExporter(mockSvc, entityServiceMock)
 
 	attrs := json.RawMessage(`{"username":"alice"}`)
 	mockSvc.On("GetUser", context.Background(), "user-1", false).
 		Return(&providers.User{ID: "user-1", Type: "person", OUID: "ou-1", Attributes: attrs}, nil)
+	entityServiceMock.On("GetCredentialsByType", context.Background(), "user-1", "password").
+		Return([]entitypkg.StoredCredential{{}}, nil)
 
 	resource, name, err := exporter.GetResourceByID(context.Background(), "user-1")
 	suite.Nil(err)
@@ -179,10 +182,30 @@ func (suite *DeclarativeResourceTestSuite) TestUserExporter_GetResourceByID() {
 
 	userResource, ok := resource.(*userDeclarativeResource)
 	suite.True(ok)
-	// The password carries a template variable derived from the username. Exporting no credential at
-	// all would leave the imported user unable to sign in, and the value cannot be exported because it
-	// is stored as a one-way hash, so the importing server fills the variable instead.
+	// The password carries a template variable derived from the username. The value cannot be
+	// exported because it is stored as a one-way hash, so the importing server fills the variable.
 	suite.Equal("{{.USER_ALICE_PASSWORD}}", userResource.Credentials["password"])
+}
+
+// A user who signs in some other way has no password to name. Naming one anyway would make every
+// gateway this is applied to demand a credential the user never had, and refuse the user outright.
+func (suite *DeclarativeResourceTestSuite) TestUserExporter_GetResourceByID_NoPassword() {
+	mockSvc := NewUserServiceInterfaceMock(suite.T())
+	entityServiceMock := entitymock.NewEntityServiceInterfaceMock(suite.T())
+	exporter := newUserExporter(mockSvc, entityServiceMock)
+
+	attrs := json.RawMessage(`{"username":"alice"}`)
+	mockSvc.On("GetUser", context.Background(), "user-1", false).
+		Return(&providers.User{ID: "user-1", Type: "person", OUID: "ou-1", Attributes: attrs}, nil)
+	entityServiceMock.On("GetCredentialsByType", context.Background(), "user-1", "password").
+		Return([]entitypkg.StoredCredential{}, nil)
+
+	resource, _, err := exporter.GetResourceByID(context.Background(), "user-1")
+	suite.Nil(err)
+
+	userResource, ok := resource.(*userDeclarativeResource)
+	suite.True(ok)
+	suite.Empty(userResource.Credentials, "a user with no password must carry no credentials")
 }
 
 func (suite *DeclarativeResourceTestSuite) TestUserExporter_Metadata() {

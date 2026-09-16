@@ -141,7 +141,7 @@ func SubstituteEnvironmentVariables(content []byte) ([]byte, error) {
 	for _, match := range rangeMatches {
 		if len(match) > 1 {
 			varName := match[1]
-			arrayElements := buildArrayFromEnvVars(varName)
+			arrayElements := buildArrayFromGatewayVars(varName)
 			templateVars[varName] = arrayElements
 		}
 	}
@@ -195,9 +195,9 @@ func shieldNonGoTemplateExpressions(content string) (string, map[string]string) 
 	return result, restore
 }
 
-// buildArrayFromEnvVars builds an array by reading environment variables with indexed suffixes
+// buildArrayFromGatewayVars builds an array by reading environment variables with indexed suffixes
 // starting from VARNAME_0, VARNAME_1, etc., until an empty or non-existent variable is found.
-func buildArrayFromEnvVars(varName string) []string {
+func buildArrayFromGatewayVars(varName string) []string {
 	var elements []string
 	index := 0
 

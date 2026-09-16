@@ -343,6 +343,52 @@ func TestGetRequiredPermissionForAPI(t *testing.T) {
 		{name: "GET /groups exact", method: http.MethodGet, path: "/groups", wantPerm: p.GroupView},
 		{name: "POST /groups exact", method: http.MethodPost, path: "/groups", wantPerm: p.Group},
 
+		// ---- Gateway variables, named by the path the server actually serves. A rule naming a path
+		// that is not served matches nothing, and the route silently falls back to the root
+		// permission, which makes the fine-grained permission unreachable. ----
+		{
+			name:   "GET a gateway's variables",
+			method: http.MethodGet, path: "/gateways/env-1/variables", wantPerm: p.GatewayVarView,
+		},
+		{
+			name:   "POST a gateway variable",
+			method: http.MethodPost, path: "/gateways/env-1/variables", wantPerm: p.GatewayVar,
+		},
+		{
+			name:   "GET one gateway variable",
+			method: http.MethodGet, path: "/gateways/env-1/variables/var-1", wantPerm: p.GatewayVarView,
+		},
+		{
+			name:   "GET the resolved gateway variables",
+			method: http.MethodGet, path: "/gateways/env-1/variables/resolve", wantPerm: p.GatewayVarView,
+		},
+		{
+			name:   "PUT one gateway variable",
+			method: http.MethodPut, path: "/gateways/env-1/variables/var-1", wantPerm: p.GatewayVar,
+		},
+		{
+			name:   "DELETE one gateway variable",
+			method: http.MethodDelete, path: "/gateways/env-1/variables/var-1", wantPerm: p.GatewayVar,
+		},
+
+		// ---- Administering a gateway itself takes the root permission, stated rather than reached
+		// through the fallback. ----
+		{name: "GET /gateways", method: http.MethodGet, path: "/gateways", wantPerm: p.Root},
+		{name: "POST /gateways", method: http.MethodPost, path: "/gateways", wantPerm: p.Root},
+		{
+			name:   "POST a gateway apply",
+			method: http.MethodPost, path: "/gateways/env-1/apply", wantPerm: p.Root,
+		},
+		{
+			name:   "POST a gateway version capture",
+			method: http.MethodPost, path: "/gateways/env-1/versions", wantPerm: p.Root,
+		},
+
+		// ---- Tenant self-management. The path names no tenant: the caller acts on its own. ----
+		{name: "GET /tenant exact", method: http.MethodGet, path: "/tenant", wantPerm: p.TenantView},
+		{name: "POST /tenant exact", method: http.MethodPost, path: "/tenant", wantPerm: p.Tenant},
+		{name: "DELETE /tenant exact", method: http.MethodDelete, path: "/tenant", wantPerm: p.Tenant},
+
 		// ---- Self-service paths (empty permission = any authenticated user) ----
 		{name: "GET /users/me self-service", method: http.MethodGet, path: "/users/me", wantPerm: ""},
 		{name: "PUT /users/me self-service", method: http.MethodPut, path: "/users/me", wantPerm: ""},

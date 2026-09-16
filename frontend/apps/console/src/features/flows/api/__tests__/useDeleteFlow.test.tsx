@@ -67,9 +67,15 @@ describe('useDeleteFlow', () => {
   });
 
   it('should set pending state during deletion', async () => {
+    // The request finishes when this test says so. Against a real timer, a loaded machine can let the
+    // request complete before the pending assertion first runs, and it then never observes it.
+    // Replaced synchronously by the promise below; this stands in only so the type is not nullable.
+    let finishRequest: (value: unknown) => void = () => {
+      throw new Error('the request was released before it was started');
+    };
     mockHttpRequest.mockReturnValue(
       new Promise((resolve) => {
-        setTimeout(() => resolve({}), 100);
+        finishRequest = resolve;
       }),
     );
 
@@ -80,6 +86,8 @@ describe('useDeleteFlow', () => {
     await waitFor(() => {
       expect(result.current.isPending).toBe(true);
     });
+
+    finishRequest({});
 
     await waitFor(() => {
       expect(result.current.isPending).toBe(false);

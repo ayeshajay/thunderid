@@ -195,9 +195,16 @@ export default function CreateUserTypePage(): JSX.Element {
       return;
     }
 
-    const trimmedOuId = ouId.trim();
+    // The organization unit the wizard resolved: the one chosen where there is a choice, and the
+    // only one otherwise. Reading the raw state here instead would submit nothing on a single-OU
+    // deployment, where the step that fills it is skipped and there is no field to correct.
+    const trimmedOuId = (resolvedOuId ?? '').trim();
     if (!trimmedOuId) {
-      setError(t('userTypes:validationErrors.ouIdRequired', 'Please provide an organization unit ID'));
+      setError(
+        isOuLoading
+          ? t('userTypes:validationErrors.ouIdLoading', 'Still loading the organization unit. Try again in a moment.')
+          : t('userTypes:validationErrors.ouIdRequired', 'Please provide an organization unit ID'),
+      );
       return;
     }
 
@@ -494,7 +501,7 @@ export default function CreateUserTypePage(): JSX.Element {
 
                 <Button
                   variant="contained"
-                  disabled={!stepReady[currentStep] || createUserTypeMutation.isPending}
+                  disabled={!stepReady[currentStep] || createUserTypeMutation.isPending || isOuLoading}
                   sx={{minWidth: 140}}
                   onClick={handleNextStep}
                 >

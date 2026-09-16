@@ -2811,7 +2811,7 @@ func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_EmptyCl
 
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_EntityNotFound() {
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(nil, &entityprovider.EntityProviderError{
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(nil, &entityprovider.EntityProviderError{
 		Code: entityprovider.ErrorCodeEntityNotFound,
 	})
 	svc := &inboundClientService{entityProvider: ep, store: newInboundClientStoreInterfaceMock(suite.T())}
@@ -2822,7 +2822,7 @@ func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_EntityN
 
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_IdentifyErrorPropagated() {
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(nil, &entityprovider.EntityProviderError{
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(nil, &entityprovider.EntityProviderError{
 		Code: entityprovider.ErrorCodeSystemError, Message: "boom",
 	})
 	svc := &inboundClientService{entityProvider: ep, store: newInboundClientStoreInterfaceMock(suite.T())}
@@ -2833,7 +2833,7 @@ func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_Identif
 
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_NilEntityID() {
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(nil, nil)
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(nil, nil)
 	svc := &inboundClientService{entityProvider: ep, store: newInboundClientStoreInterfaceMock(suite.T())}
 	got, err := svc.GetOAuthClientByClientID(context.Background(), "x")
 	assert.NoError(suite.T(), err)
@@ -2845,8 +2845,8 @@ const testServiceEntityID = "ent-1"
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_GetEntityNotFound() {
 	id := testServiceEntityID
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(&id, nil)
-	ep.EXPECT().GetEntity(id).Return(nil, &entityprovider.EntityProviderError{
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(&id, nil)
+	ep.EXPECT().GetEntity(mock.Anything, id).Return(nil, &entityprovider.EntityProviderError{
 		Code: entityprovider.ErrorCodeEntityNotFound,
 	})
 	svc := &inboundClientService{entityProvider: ep, store: newInboundClientStoreInterfaceMock(suite.T())}
@@ -2858,8 +2858,8 @@ func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_GetEnti
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_OAuthProfileNotFoundReturnsNil() {
 	id := testServiceEntityID
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(&id, nil)
-	ep.EXPECT().GetEntity(id).Return(&providers.Entity{ID: id, OUID: "ou-1"}, nil)
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(&id, nil)
+	ep.EXPECT().GetEntity(mock.Anything, id).Return(&providers.Entity{ID: id, OUID: "ou-1"}, nil)
 
 	store := newInboundClientStoreInterfaceMock(suite.T())
 	store.EXPECT().GetOAuthProfileByEntityID(mock.Anything, id).Return(nil, ErrInboundClientNotFound)
@@ -2873,8 +2873,8 @@ func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_OAuthPr
 func (suite *InboundClientServiceTestSuite) TestGetOAuthClientByClientID_StoreErrorPropagated() {
 	id := testServiceEntityID
 	ep := entityprovidermock.NewEntityProviderInterfaceMock(suite.T())
-	ep.EXPECT().IdentifyEntity(mock.Anything).Return(&id, nil)
-	ep.EXPECT().GetEntity(id).Return(&providers.Entity{ID: id, OUID: "ou-1"}, nil)
+	ep.EXPECT().IdentifyEntity(mock.Anything, mock.Anything).Return(&id, nil)
+	ep.EXPECT().GetEntity(mock.Anything, id).Return(&providers.Entity{ID: id, OUID: "ou-1"}, nil)
 
 	storeErr := errors.New("db down")
 	store := newInboundClientStoreInterfaceMock(suite.T())

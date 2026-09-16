@@ -1,1 +1,17 @@
 target
+
+# Version control and dependency trees. The build installs its own dependencies and the frontend
+# bundle is staged in beforehand, so shipping these only slows the context transfer.
+.git
+.github
+**/node_modules
+**/coverage
+.turbo
+.nx
+
+# Databases and secret material written by a local run. These are runtime data, never build inputs:
+# the image provisions its own server home under /opt/thunderid.
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/config/secrets/

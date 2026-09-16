@@ -285,6 +285,9 @@ func (es *entityDBStore) UpdateEntity(ctx context.Context, entity *providers.Ent
 }
 
 // UpdateAttributes updates only the schema attributes of an entity and re-syncs attribute-sourced identifiers.
+// identifier set. Merging them would hide which of the two a caller is reaching for.
+//
+//nolint:dupl // Mirrors UpdateSystemAttributes by shape only: a different query and a different
 func (es *entityDBStore) UpdateAttributes(ctx context.Context, entityID string, attributes json.RawMessage) error {
 	dbClient, err := es.dbProvider.GetEntityDBClient()
 	if err != nil {
@@ -314,6 +317,8 @@ func (es *entityDBStore) UpdateAttributes(ctx context.Context, entityID string, 
 }
 
 // UpdateSystemAttributes updates the system attributes of an entity and re-syncs system-sourced identifiers.
+//
+//nolint:dupl // See UpdateAttributes: same shape, different query and identifier set.
 func (es *entityDBStore) UpdateSystemAttributes(ctx context.Context, entityID string,
 	attrs json.RawMessage) error {
 	dbClient, err := es.dbProvider.GetEntityDBClient()

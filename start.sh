@@ -149,7 +149,7 @@ set -e  # Exit immediately if a command exits with a non-zero status
 check_port() {
     local port=$1
     local port_name=$2
-    if lsof -ti tcp:$port >/dev/null 2>&1; then
+    if lsof -ti tcp:$port -sTCP:LISTEN >/dev/null 2>&1; then
         echo ""
         echo "❌ Port $port is already in use"
         echo "   $port_name cannot start because another process is using port $port"
@@ -158,7 +158,7 @@ check_port() {
         echo "   lsof -i tcp:$port"
         echo ""
         echo "💡 To stop the process:"
-        echo "   kill -9 \$(lsof -ti tcp:$port)"
+        echo "   kill -9 \$(lsof -ti tcp:$port -sTCP:LISTEN)"
         echo ""
         exit 1
     fi

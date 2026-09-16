@@ -223,10 +223,17 @@ describe('useDeleteApplication', () => {
   });
 
   it('should set pending state during deletion', async () => {
+    // The request finishes when this test says so, not after a wall-clock delay. A real timer makes
+    // the pending state a race: on a loaded machine the request can complete before the assertion
+    // first runs, and the budget for the success assertion can expire before the timer fires.
+    // Replaced synchronously by the promise below; this stands in only so the type is not nullable.
+    let finishRequest: (value: unknown) => void = () => {
+      throw new Error('the request was released before it was started');
+    };
     mockFlowDeletion({
       '/flow/execute': () =>
         new Promise((resolve) => {
-          setTimeout(() => resolve({data: {flowStatus: 'COMPLETE'}}), 100);
+          finishRequest = resolve;
         }),
     });
 
@@ -239,12 +246,11 @@ describe('useDeleteApplication', () => {
       expect(result.current.isPending).toBe(true);
     });
 
-    await waitFor(
-      () => {
-        expect(result.current.isSuccess).toBe(true);
-      },
-      {timeout: 200},
-    );
+    finishRequest({data: {flowStatus: 'COMPLETE'}});
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
 
     expect(result.current.isPending).toBe(false);
   });

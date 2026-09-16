@@ -204,8 +204,10 @@ func validateTranslationWrapper(data interface{}, fileStore *fileBasedStore) err
 
 	id := trans.Language
 
-	// Check for duplicate ID in the file store
-	if existingData, err := fileStore.GenericFileBasedStore.Get(id); err == nil && existingData != nil {
+	// Check for duplicate ID in the file store. Loading is not a read on behalf of a deployment: it
+	// happens as the file is parsed, before any request exists.
+	if existingData, err := fileStore.GenericFileBasedStore.GetForLoad(id); err == nil &&
+		existingData != nil {
 		return fmt.Errorf("duplicate translation ID '%s': "+
 			"a translation with this ID already exists in declarative resources", id)
 	}

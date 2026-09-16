@@ -36,6 +36,13 @@ type dbConfig struct {
 	driverName string
 }
 
+// ErrDataSourceNotConfigured reports a datasource this deployment does not configure.
+//
+// It is a sentinel because it is a normal state rather than a failure: a plane that holds no runtime
+// state configures no runtime datasource, and a caller that touches one has to tell "this deployment
+// does not have it" apart from "it is there and broken".
+var ErrDataSourceNotConfigured = errors.New("datasource is not configured")
+
 // DBProviderInterface defines the interface for getting database clients and transactioners.
 type DBProviderInterface interface {
 	GetConfigDBClient() (DBClientInterface, error)
@@ -207,7 +214,7 @@ func (d *dbProvider) getOrInitClient(
 ) (DBClientInterface, error) {
 	// Return error if database type is not configured
 	if dataSource.Type == "" {
-		return nil, fmt.Errorf("database type is not configured")
+		return nil, fmt.Errorf("%w: %s", ErrDataSourceNotConfigured, dbName)
 	}
 	// Redis runtime stores bypass the SQL client entirely
 	if dataSource.Type == DataSourceTypeRedis {

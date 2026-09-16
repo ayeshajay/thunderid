@@ -129,9 +129,15 @@ describe('useGetFlowById', () => {
   });
 
   it('should show loading state while fetching', async () => {
+    // The request finishes when this test says so, so the loading state is observed rather than raced
+    // against a wall-clock delay.
+    // Replaced synchronously by the promise below; this stands in only so the type is not nullable.
+    let finishRequest: (value: unknown) => void = () => {
+      throw new Error('the request was released before it was started');
+    };
     mockHttpRequest.mockReturnValue(
       new Promise((resolve) => {
-        setTimeout(() => resolve({data: mockFlowResponse}), 100);
+        finishRequest = resolve;
       }),
     );
 
@@ -139,6 +145,8 @@ describe('useGetFlowById', () => {
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.data).toBeUndefined();
+
+    finishRequest({data: mockFlowResponse});
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);

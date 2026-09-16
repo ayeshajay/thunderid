@@ -10,6 +10,7 @@ package deployment
 
 import (
 	"context"
+	"strings"
 
 	"github.com/thunder-id/thunderid/internal/system/config"
 )
@@ -49,4 +50,43 @@ func Resolve(ctx context.Context) string {
 		return ""
 	}
 	return config.GetServerRuntime().Config.Server.Identifier
+}
+
+// IDFromContext returns the deployment id the context names, and whether it named one.
+//
+// The distinction matters where "no deployment" is not the same as "the server's own": declarative
+// resources loaded at startup run before any request exists, and must see everything.
+func IDFromContext(ctx context.Context) (string, bool) {
+	return fromContext(ctx)
+}
+
+// ResolveDefault returns the deployment id for the request, falling back to the server's own
+// identifier. It is for callers that scope by deployment but hold no configured value of their own,
+// such as the cache layer.
+func ResolveDefault(ctx context.Context) string {
+	return Resolve(ctx)
+}
+
+// OrganizationOf returns the organization a deployment id belongs to.
+//
+// A deployment id names a gateway as "<org>:<gateway>", and everything an organization owns across
+// its gateways is partitioned under the organization rather than under any one gateway. An id
+// naming no organization is its own organization.
+func OrganizationOf(id string) string {
+	org, _, found := strings.Cut(id, ":")
+	if !found || strings.TrimSpace(org) == "" {
+		return id
+	}
+	return org
+}
+
+// ResolveOr returns the deployment id the context names, falling back to the given id.
+//
+// It is for stores that hold a configured deployment id of their own, where the fallback is that
+// value rather than the server's. Stores that hold none use Resolve.
+func ResolveOr(ctx context.Context, fallback string) string {
+	if id, ok := fromContext(ctx); ok {
+		return id
+	}
+	return fallback
 }

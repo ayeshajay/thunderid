@@ -10,8 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/thunder-id/thunderid/internal/system/config"
@@ -297,7 +298,7 @@ translations:
 	err = loadDeclarativeResources(store)
 	assert.NoError(s.T(), err)
 
-	exists, err := store.IsTranslationExists("es-ES")
+	exists, err := store.IsTranslationExists(context.Background(), "es-ES")
 	assert.NoError(s.T(), err)
 	assert.True(s.T(), exists)
 }

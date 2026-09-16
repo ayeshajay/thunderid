@@ -19,3 +19,4 @@ CREATE DATABASE runtime_persistent;
 -- Run db4 initialization
 \connect runtime_persistent
 \i /docker-entrypoint-initdb.d/runtime-persistent-postgres.sql
+

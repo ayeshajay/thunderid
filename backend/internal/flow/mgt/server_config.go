@@ -56,7 +56,12 @@ func (h *FlowConfigHandler) Decode(raw json.RawMessage) (any, error) {
 
 // Validate checks structural constraints on the incoming FlowSectionConfig. When a validator is present,
 // it additionally verifies that every non-empty handle references an existing flow of the correct type.
-func (h *FlowConfigHandler) Validate(incoming, _, _ any) error {
+//
+// The caller's context carries the deployment the configuration is being written for, so the handles
+// are looked up in that deployment. Resolving them against a background context instead would search
+// whichever deployment the server itself runs as, and a tenant being provisioned would appear to have
+// none of the flows its own baseline had just created.
+func (h *FlowConfigHandler) Validate(ctx context.Context, incoming, _, _ any) error {
 	cfg, ok := incoming.(flowconfig.FlowSectionConfig)
 	if !ok {
 		return fmt.Errorf("flow: unexpected config type %T", incoming)
@@ -77,8 +82,6 @@ func (h *FlowConfigHandler) Validate(incoming, _, _ any) error {
 		{cfg.ApplicationDeletionFlow, providers.FlowTypeAdministration, "applicationDeletionFlow"},
 		{cfg.SecretRegenerationFlow, providers.FlowTypeAdministration, "secretRegenerationFlow"},
 	}
-	ctx := context.Background()
-
 	for _, e := range entries {
 		if e.tc.ExpirySeconds < 0 {
 			return fmt.Errorf("flow: %s.expirySeconds must be >= 0", e.field)

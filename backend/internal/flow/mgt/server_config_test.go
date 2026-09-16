@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	flowconfig "github.com/thunder-id/thunderid/internal/flow/config"
+	"github.com/thunder-id/thunderid/internal/system/deployment"
 	"github.com/thunder-id/thunderid/pkg/thunderidengine/providers"
 )
 
@@ -57,7 +58,7 @@ func (s *FlowConfigHandlerTestSuite) TestDecode_InvalidJSON() {
 }
 
 func (s *FlowConfigHandlerTestSuite) TestValidate_WrongType() {
-	err := s.handler.Validate("not-a-config", nil, nil)
+	err := s.handler.Validate(context.Background(), "not-a-config", nil, nil)
 	s.Error(err)
 }
 
@@ -65,7 +66,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_NegativeExpiry() {
 	cfg := flowconfig.FlowSectionConfig{
 		AuthFlow: flowconfig.FlowTypeConfig{ExpirySeconds: -1},
 	}
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 	s.Error(err)
 }
 
@@ -76,7 +77,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_ValidConfig() {
 		RecoveryFlow:     flowconfig.FlowTypeConfig{ExpirySeconds: 1800},
 		SignOutFlow:      flowconfig.FlowTypeConfig{ExpirySeconds: 1800},
 	}
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 	s.NoError(err)
 }
 
@@ -90,7 +91,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_HandleValidatorCalled() {
 	cfg := flowconfig.FlowSectionConfig{
 		AuthFlow: flowconfig.FlowTypeConfig{DefaultHandle: "valid-handle"},
 	}
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 	s.NoError(err)
 	s.True(called)
 }
@@ -103,7 +104,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_HandleValidatorRejectsUnknown(
 	cfg := flowconfig.FlowSectionConfig{
 		SignOutFlow: flowconfig.FlowTypeConfig{DefaultHandle: "nonexistent"},
 	}
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 	s.Error(err)
 }
 
@@ -111,7 +112,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_NoValidatorSkipsHandleCheck() 
 	cfg := flowconfig.FlowSectionConfig{
 		AuthFlow: flowconfig.FlowTypeConfig{DefaultHandle: "any-handle"},
 	}
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 	s.NoError(err)
 }
 
@@ -171,7 +172,7 @@ func (s *FlowConfigHandlerTestSuite) TestMergeFlowTypeConfig_WritableExpiryWins(
 // An unset handle is valid: it is how a deployment opts out of flow-based deletion and keeps the
 // native endpoint.
 func (s *FlowConfigHandlerTestSuite) TestValidate_UserDeletionHandleOptional() {
-	s.NoError(s.handler.Validate(flowconfig.FlowSectionConfig{}, nil, nil))
+	s.NoError(s.handler.Validate(context.Background(), flowconfig.FlowSectionConfig{}, nil, nil))
 }
 
 // The handle must name an administration flow, not merely exist.
@@ -185,7 +186,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_UserDeletionHandleCheckedAgain
 		UserDeletionFlow: flowconfig.FlowTypeConfig{DefaultHandle: "default-user-deletion-flow"},
 	}
 
-	s.Require().NoError(s.handler.Validate(cfg, nil, nil))
+	s.Require().NoError(s.handler.Validate(context.Background(), cfg, nil, nil))
 	s.Equal(providers.FlowTypeAdministration, gotType)
 }
 
@@ -197,7 +198,7 @@ func (s *FlowConfigHandlerTestSuite) TestValidate_UserDeletionHandleRejectedWhen
 		UserDeletionFlow: flowconfig.FlowTypeConfig{DefaultHandle: "not-an-admin-flow"},
 	}
 
-	err := s.handler.Validate(cfg, nil, nil)
+	err := s.handler.Validate(context.Background(), cfg, nil, nil)
 
 	s.Require().Error(err)
 	s.Contains(err.Error(), "userDeletionFlow.defaultHandle")
@@ -226,4 +227,27 @@ func (s *FlowConfigHandlerTestSuite) TestMerge_EmptyWritableKeepsDeclarativeUser
 	merged, _ := s.handler.Merge(ro, flowconfig.FlowSectionConfig{}).(flowconfig.FlowSectionConfig)
 
 	s.Equal("default-user-deletion-flow", merged.UserDeletionFlow.DefaultHandle)
+}
+
+// The handles are looked up in the deployment the configuration is being written for, which the
+// caller's context carries. A tenant being provisioned holds the flows its own baseline just created,
+// and resolving against a background context instead would search the deployment the server itself
+// runs as and find none of them.
+func (s *FlowConfigHandlerTestSuite) TestValidate_LooksUpHandlesInTheCallersDeployment() {
+	var seen []string
+	s.handler.SetHandleValidator(func(ctx context.Context, _ string, _ providers.FlowType) bool {
+		seen = append(seen, deployment.Resolve(ctx))
+		return true
+	})
+	cfg := flowconfig.FlowSectionConfig{
+		AuthFlow: flowconfig.FlowTypeConfig{DefaultHandle: "default-flow"},
+	}
+
+	err := s.handler.Validate(deployment.WithID(context.Background(), "acme"), cfg, nil, nil)
+
+	s.Require().NoError(err)
+	s.Require().NotEmpty(seen, "the handle validator should have been consulted")
+	for _, got := range seen {
+		s.Equal("acme", got, "the handle must be resolved in the caller's deployment")
+	}
 }

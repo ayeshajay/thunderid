@@ -481,7 +481,7 @@ fi
 check_port() {
     local port=$1
     local port_name=$2
-    if lsof -ti tcp:$port >/dev/null 2>&1; then
+    if lsof -ti tcp:$port -sTCP:LISTEN >/dev/null 2>&1; then
         echo ""
         echo -e "${RED}❌ Port $port is already in use${NC}"
         echo -e "${RED}   $port_name cannot start because another process is using port $port${NC}"
@@ -490,7 +490,7 @@ check_port() {
         echo "   lsof -i tcp:$port"
         echo ""
         echo -e "${YELLOW}💡 To stop the process:${NC}"
-        echo "   kill -9 \$(lsof -ti tcp:$port)"
+        echo "   kill -9 \$(lsof -ti tcp:$port -sTCP:LISTEN)"
         echo ""
         exit 1
     fi

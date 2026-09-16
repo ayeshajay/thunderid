@@ -43,7 +43,7 @@ func (suite *LayoutStoreTestSuite) TestGetLayoutListCount_Success() {
 		{"total": int64(5)},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "test-deployment").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "test-deployment").Return(results, nil)
 
 	count, err := suite.store.GetLayoutListCount(context.Background())
 
@@ -64,7 +64,7 @@ func (suite *LayoutStoreTestSuite) TestGetLayoutListCount_DBClientError() {
 // Test GetLayoutListCount - Query error
 func (suite *LayoutStoreTestSuite) TestGetLayoutListCount_QueryError() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "test-deployment").
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "test-deployment").
 		Return(nil, errors.New("query error"))
 
 	count, err := suite.store.GetLayoutListCount(context.Background())
@@ -94,7 +94,7 @@ func (suite *LayoutStoreTestSuite) TestGetLayoutList_Success() {
 		},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, 10, 0, "test-deployment").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, 10, 0, "test-deployment").Return(results, nil)
 
 	layouts, err := suite.store.GetLayoutList(context.Background(), 10, 0)
 
@@ -117,7 +117,7 @@ func (suite *LayoutStoreTestSuite) TestGetLayoutList_DBClientError() {
 // Test CreateLayout - Success
 func (suite *LayoutStoreTestSuite) TestCreateLayout_Success() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Execute", mock.Anything, "layout-1", "classic", "Test", "Desc",
+	suite.mockDBClient.On("ExecuteContext", mock.Anything, mock.Anything, "layout-1", "classic", "Test", "Desc",
 		mock.Anything, "test-deployment").Return(int64(1), nil)
 
 	err := suite.store.CreateLayout(context.Background(), "layout-1", CreateLayoutRequest{
@@ -144,7 +144,8 @@ func (suite *LayoutStoreTestSuite) TestGetLayout_Success() {
 		},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "layout-123", "test-deployment").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "layout-123", "test-deployment").Return(results,
+		nil)
 
 	layout, err := suite.store.GetLayout(context.Background(), "layout-123")
 
@@ -156,7 +157,7 @@ func (suite *LayoutStoreTestSuite) TestGetLayout_Success() {
 // Test GetLayout - Not found
 func (suite *LayoutStoreTestSuite) TestGetLayout_NotFound() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "non-existent", "test-deployment").
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "non-existent", "test-deployment").
 		Return([]map[string]interface{}{}, nil)
 
 	_, err := suite.store.GetLayout(context.Background(), "non-existent")
@@ -172,7 +173,8 @@ func (suite *LayoutStoreTestSuite) TestGetLayout_MultipleResults() {
 		{"id": "2", "display_name": "B", "description": "Y", "layout": `{}`},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "layout-123", "test-deployment").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "layout-123", "test-deployment").Return(results,
+		nil)
 
 	_, err := suite.store.GetLayout(context.Background(), "layout-123")
 
@@ -186,7 +188,8 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutExist_True() {
 		{"total": int64(1)},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "layout-123", "test-deployment").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "layout-123", "test-deployment").Return(results,
+		nil)
 
 	exists, err := suite.store.IsLayoutExist(context.Background(), "layout-123")
 
@@ -197,7 +200,7 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutExist_True() {
 // Test IsLayoutExist - Not exists
 func (suite *LayoutStoreTestSuite) TestIsLayoutExist_False() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "non-existent", "test-deployment").
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "non-existent", "test-deployment").
 		Return([]map[string]interface{}{}, nil)
 
 	exists, err := suite.store.IsLayoutExist(context.Background(), "non-existent")
@@ -209,7 +212,7 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutExist_False() {
 // Test DeleteLayout - Success
 func (suite *LayoutStoreTestSuite) TestDeleteLayout_Success() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Execute", mock.Anything, "layout-123", "test-deployment").
+	suite.mockDBClient.On("ExecuteContext", mock.Anything, mock.Anything, "layout-123", "test-deployment").
 		Return(int64(1), nil)
 
 	err := suite.store.DeleteLayout(context.Background(), "layout-123")
@@ -368,7 +371,9 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutHandleConflict_Conflict() {
 		{"total": int64(1)},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "classic", "test-deployment", "").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "classic", "test-deployment", "").
+		Return(results,
+			nil)
 
 	conflict, err := suite.store.IsLayoutHandleConflict(context.Background(), "classic", "")
 
@@ -382,7 +387,8 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutHandleConflict_NoConflict() {
 		{"total": int64(0)},
 	}
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "unique-handle", "test-deployment", "layout-1").Return(results, nil)
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "unique-handle", "test-deployment", "layout-1").
+		Return(results, nil)
 
 	conflict, err := suite.store.IsLayoutHandleConflict(context.Background(), "unique-handle", "layout-1")
 
@@ -403,7 +409,7 @@ func (suite *LayoutStoreTestSuite) TestIsLayoutHandleConflict_DBClientError() {
 // Test IsLayoutHandleConflict - Query error
 func (suite *LayoutStoreTestSuite) TestIsLayoutHandleConflict_QueryError() {
 	suite.mockDBProvider.On("GetConfigDBClient").Return(suite.mockDBClient, nil)
-	suite.mockDBClient.On("Query", mock.Anything, "classic", "test-deployment", "").
+	suite.mockDBClient.On("QueryContext", mock.Anything, mock.Anything, "classic", "test-deployment", "").
 		Return(nil, errors.New("query error"))
 
 	conflict, err := suite.store.IsLayoutHandleConflict(context.Background(), "classic", "")

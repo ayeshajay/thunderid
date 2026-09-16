@@ -207,11 +207,11 @@ func (s *FileBasedStoreTestSuite) TestIsTranslationExists() {
 	err := s.store.Create("en-US", enTrans)
 	assert.NoError(s.T(), err)
 
-	exists, err := s.store.IsTranslationExists("en-US")
+	exists, err := s.store.IsTranslationExists(context.Background(), "en-US")
 	assert.NoError(s.T(), err)
 	assert.True(s.T(), exists)
 
-	exists, err = s.store.IsTranslationExists("fr-FR")
+	exists, err = s.store.IsTranslationExists(context.Background(), "fr-FR")
 	assert.NoError(s.T(), err)
 	assert.False(s.T(), exists)
 }
@@ -263,10 +263,10 @@ func (s *FileBasedStoreTestSuite) TestIsTranslationDeclarative() {
 	assert.NoError(s.T(), err)
 
 	// Checks if "en-US" is in the store
-	isDeclarative := s.store.IsTranslationDeclarative("en-US")
+	isDeclarative := s.store.IsTranslationDeclarative(context.Background(), "en-US")
 	assert.True(s.T(), isDeclarative)
 
-	isDeclarative = s.store.IsTranslationDeclarative("fr-FR")
+	isDeclarative = s.store.IsTranslationDeclarative(context.Background(), "fr-FR")
 	assert.False(s.T(), isDeclarative)
 }
 

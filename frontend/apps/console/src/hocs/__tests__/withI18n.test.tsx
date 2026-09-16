@@ -1,7 +1,7 @@
 // Copyright 2026 The ThunderID Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import {render, screen} from '@testing-library/react';
+import {render} from '@testing-library/react';
 import {describe, it, expect, vi} from 'vitest';
 
 // Mock i18next top-level await before importing withI18n
@@ -44,8 +44,10 @@ describe('withI18n (console)', () => {
     }
     const WithI18nComponent = withI18n(MockChild);
 
-    render(<WithI18nComponent />);
-    expect(screen.getByTestId('mock-child')).toBeInTheDocument();
+    // Queried within this render rather than the whole document: a global query also sees whatever an
+    // earlier test left mounted, and every test here renders the same test ids.
+    const {getByTestId} = render(<WithI18nComponent />);
+    expect(getByTestId('mock-child')).toBeInTheDocument();
   });
 
   it('wraps with I18nProvider', async () => {
@@ -55,8 +57,8 @@ describe('withI18n (console)', () => {
     }
     const WithI18nComponent = withI18n(MockChild);
 
-    render(<WithI18nComponent />);
-    expect(screen.getByTestId('i18n-provider')).toBeInTheDocument();
+    const {getByTestId} = render(<WithI18nComponent />);
+    expect(getByTestId('i18n-provider')).toBeInTheDocument();
   });
 
   it('places the wrapped component inside I18nProvider', async () => {
@@ -66,9 +68,9 @@ describe('withI18n (console)', () => {
     }
     const WithI18nComponent = withI18n(MockChild);
 
-    render(<WithI18nComponent />);
-    const provider = screen.getByTestId('i18n-provider');
-    const child = screen.getByTestId('mock-child');
+    const {getByTestId} = render(<WithI18nComponent />);
+    const provider = getByTestId('i18n-provider');
+    const child = getByTestId('mock-child');
     expect(provider).toContainElement(child);
   });
 
@@ -79,8 +81,8 @@ describe('withI18n (console)', () => {
     }
     const AnotherWrapped = withI18n(AnotherChild);
 
-    render(<AnotherWrapped />);
-    expect(screen.getByTestId('another-child')).toBeInTheDocument();
-    expect(screen.getByTestId('i18n-provider')).toBeInTheDocument();
+    const {getByTestId} = render(<AnotherWrapped />);
+    expect(getByTestId('another-child')).toBeInTheDocument();
+    expect(getByTestId('i18n-provider')).toBeInTheDocument();
   });
 });

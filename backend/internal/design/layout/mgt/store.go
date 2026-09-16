@@ -12,6 +12,7 @@ import (
 
 	"github.com/thunder-id/thunderid/internal/system/config"
 	"github.com/thunder-id/thunderid/internal/system/database/provider"
+	"github.com/thunder-id/thunderid/internal/system/deployment"
 )
 
 var errLayoutNotFound = errors.New("layout not found")
@@ -50,7 +51,7 @@ func (s *layoutMgtStore) GetLayoutListCount(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	countResults, err := dbClient.Query(queryGetLayoutListCount, s.deploymentID)
+	countResults, err := dbClient.QueryContext(ctx, queryGetLayoutListCount, s.scope(ctx))
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute count query: %w", err)
 	}
@@ -65,7 +66,7 @@ func (s *layoutMgtStore) GetLayoutList(ctx context.Context, limit, offset int) (
 		return nil, err
 	}
 
-	results, err := dbClient.Query(queryGetLayoutList, limit, offset, s.deploymentID)
+	results, err := dbClient.QueryContext(ctx, queryGetLayoutList, limit, offset, s.scope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute layout list query: %w", err)
 	}
@@ -94,8 +95,8 @@ func (s *layoutMgtStore) CreateLayout(ctx context.Context, id string, layout Cre
 		return fmt.Errorf("failed to marshal layout: %w", err)
 	}
 
-	_, err = dbClient.Execute(queryCreateLayout, id, layout.Handle, layout.DisplayName, layout.Description,
-		layoutJSON, s.deploymentID)
+	_, err = dbClient.ExecuteContext(ctx, queryCreateLayout, id, layout.Handle, layout.DisplayName, layout.Description,
+		layoutJSON, s.scope(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -110,7 +111,7 @@ func (s *layoutMgtStore) GetLayout(ctx context.Context, id string) (Layout, erro
 		return Layout{}, err
 	}
 
-	results, err := dbClient.Query(queryGetLayoutByID, id, s.deploymentID)
+	results, err := dbClient.QueryContext(ctx, queryGetLayoutByID, id, s.scope(ctx))
 	if err != nil {
 		return Layout{}, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -133,7 +134,7 @@ func (s *layoutMgtStore) IsLayoutExist(ctx context.Context, id string) (bool, er
 		return false, err
 	}
 
-	results, err := dbClient.Query(queryCheckLayoutExists, id, s.deploymentID)
+	results, err := dbClient.QueryContext(ctx, queryCheckLayoutExists, id, s.scope(ctx))
 	if err != nil {
 		return false, fmt.Errorf("failed to check layout existence: %w", err)
 	}
@@ -162,7 +163,8 @@ func (s *layoutMgtStore) UpdateLayout(ctx context.Context, id string, layout Upd
 		return fmt.Errorf("failed to marshal layout: %w", err)
 	}
 
-	_, err = dbClient.Execute(queryUpdateLayout, layout.DisplayName, layout.Description, layoutJSON, id, s.deploymentID)
+	_, err = dbClient.ExecuteContext(ctx, queryUpdateLayout, layout.DisplayName, layout.Description, layoutJSON, id,
+		s.scope(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -177,7 +179,7 @@ func (s *layoutMgtStore) DeleteLayout(ctx context.Context, id string) error {
 		return err
 	}
 
-	_, err = dbClient.Execute(queryDeleteLayout, id, s.deploymentID)
+	_, err = dbClient.ExecuteContext(ctx, queryDeleteLayout, id, s.scope(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -344,7 +346,7 @@ func (s *layoutMgtStore) IsLayoutHandleConflict(ctx context.Context, handle stri
 		return false, err
 	}
 
-	results, err := dbClient.Query(queryCheckLayoutHandleConflict, handle, s.deploymentID, excludeID)
+	results, err := dbClient.QueryContext(ctx, queryCheckLayoutHandleConflict, handle, s.scope(ctx), excludeID)
 	if err != nil {
 		return false, fmt.Errorf("failed to check layout handle conflict: %w", err)
 	}
@@ -355,4 +357,10 @@ func (s *layoutMgtStore) IsLayoutHandleConflict(ctx context.Context, handle stri
 	}
 
 	return count > 0, nil
+}
+
+// scope is the deployment this store acts for: the one the request names, or the one this
+// store was built for when a caller carries none.
+func (s *layoutMgtStore) scope(ctx context.Context) string {
+	return deployment.ResolveOr(ctx, s.deploymentID)
 }

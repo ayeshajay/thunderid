@@ -10,10 +10,31 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/thunder-id/thunderid/internal/system/config"
+	"github.com/thunder-id/thunderid/internal/system/deployment"
 	"github.com/thunder-id/thunderid/internal/system/log"
+	engineconfig "github.com/thunder-id/thunderid/pkg/thunderidengine/config"
 )
 
 const loggerComponentName = "SecurityService"
+
+// deploymentSourceIsToken reports whether the instance takes the per-request deployment id from the
+// token claim (multi-tenant) rather than the configured identifier. False (server mode) when the
+// runtime is not yet initialized.
+func deploymentSourceIsToken() bool {
+	if !config.IsServerRuntimeInitialized() {
+		return false
+	}
+	return config.GetServerRuntime().Config.Server.DeploymentIDSource == engineconfig.DeploymentIDSourceToken
+}
+
+// deploymentIDClaimName returns the configured token claim carrying the per-request deployment id.
+func deploymentIDClaimName() string {
+	if !config.IsServerRuntimeInitialized() {
+		return ""
+	}
+	return config.GetServerRuntime().Config.Server.DeploymentIDClaim
+}
 
 // SecurityServiceInterface defines the contract for security processing services.
 type SecurityServiceInterface interface {
@@ -111,6 +132,32 @@ func (s *securityService) Process(r *http.Request) (context.Context, error) {
 	ctx := r.Context()
 	if securityCtx != nil {
 		ctx = withSecurityContext(ctx, securityCtx)
+
+		// Deployment id source is an exclusive switch. In "token" mode the caller's per-request
+		// deployment id must come from the token: extract the configured claim, reject the request
+		// when it is absent, and carry it in the context so stores scope persistence by it (the
+		// configured identifier is never consulted for requests). In "server" mode (the default) any
+		// token claim is ignored and stores use the configured identifier.
+		if deploymentSourceIsToken() {
+			// A trusted intermediary may name the deployment in a header instead of carrying it in
+			// its own token, which is how one caller acts for many tenants. It is read only after the
+			// token has been validated, and only when it also presents the configured key, so the
+			// header alone never decides which rows a request reaches.
+			named, keyed := headerDeploymentID(r)
+			val, _ := securityCtx.attributes[deploymentIDClaimName()].(string)
+			switch {
+			case keyed && named != "":
+				val = named
+			case keyed:
+				// The key was presented but did not hold up, or named no deployment with it. Refused
+				// rather than falling back to the token: this caller asked to act for someone else.
+				return s.handleAuthError(ctx, isPublic, errMissingDeploymentID)
+			}
+			if val == "" {
+				return s.handleAuthError(ctx, isPublic, errMissingDeploymentID)
+			}
+			ctx = deployment.WithID(ctx, val)
+		}
 
 		// Reject the request when the presented token has been revoked. This runs after successful
 		// authentication and is format-agnostic: it enforces on the token's jti and its token family

@@ -24,12 +24,25 @@ func Initialize(
 	ouService oupkg.OrganizationUnitServiceInterface,
 	entityTypeService entitytype.EntityTypeServiceInterface,
 	authzService sysauthz.SystemAuthorizationServiceInterface,
+	secretCapturer SecretCapturer,
 ) (UserServiceInterface, oupkg.OUUserResolver, declarativeresource.ResourceExporter, error) {
 	// Step 1: Create service with entity service
-	userService := newUserService(authzService, entityService, ouService, entityTypeService)
+	userService := newUserService(authzService, entityService, ouService, entityTypeService, secretCapturer)
 
 	// Step 2: Load user-specific indexed attributes into the entity store.
 	if err := entityService.LoadIndexedAttributes(getUserIndexedAttributes()); err != nil {
+		return nil, nil, nil, err
+	}
+
+	// What this resource type knows about itself, offered to whoever needs it: the rules that hold
+	// on any plane, the field that belongs to the deployment, and how its credential is made.
+	if err := registerSharedRules(); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := registerDeploymentFields(); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := registerSecretGenerator(); err != nil {
 		return nil, nil, nil, err
 	}
 

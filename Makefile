@@ -102,6 +102,15 @@ run:
 run_backend:
 	./build.sh run_backend $(OS) $(ARCH)
 
+run_cp:
+	./run-cp.sh
+
+run_dp:
+	./run-dp.sh
+
+build_cp_console:
+	./stage-cp-console.sh
+
 debug_backend:
 	./build.sh debug_backend $(OS) $(ARCH)
 
@@ -278,7 +287,7 @@ help:
 .PHONY: tools_build_i18n_extractor tools_test_i18n_extractor tools_lint_i18n_extractor
 .PHONY: tools_test_cli_e2e tools_checks_cli tools_checks
 .PHONY: verify_mocks format_check test_frontend security_audit test_e2e pr_checks
-.PHONY: run_backend debug_backend run_frontend run_docs
+.PHONY: run_backend debug_backend run_frontend run_docs run_cp run_dp build_cp_console
 
 define go_install_tool
 	cd /tmp && \
@@ -308,3 +317,6 @@ $(I18N_EXTRACTOR): $(TOOL_BIN)
 	cd tools/i18n-extractor && go test -v .
 	@echo "Building i18n-extractor..."
 	cd tools/i18n-extractor && go build -o $(I18N_EXTRACTOR) .
+
+apply_cp_to_dp:
+	./cp-to-dp.sh
