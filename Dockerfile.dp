@@ -134,7 +134,10 @@ LABEL org.opencontainers.image.source="$IMAGE_SOURCE" \
 
 EXPOSE 8090
 
-USER thunderid
+# Numeric, not the account name. Kubernetes cannot tell whether a named user is root without
+# resolving it inside the image, so a pod with runAsNonRoot refuses to start on a non-numeric USER.
+# The uid is the one created above.
+USER 10001:10001
 
 ENV BACKEND_PORT=8090
 
