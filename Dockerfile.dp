@@ -1,6 +1,7 @@
 # Copyright 2026 The ThunderID Authors
 # SPDX-License-Identifier: Apache-2.0
 
+#
 # Data Plane image.
 #
 # The Data Plane serves runtime traffic: OAuth2/OIDC, flow execution, the Direct APIs, and the gate.
